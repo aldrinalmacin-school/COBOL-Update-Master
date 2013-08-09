@@ -47,8 +47,8 @@
       *OPENS THE FILES, PROCESSES THE RECORDS AND CLOSES THE FILES 
        100-MAIN-PARA.
            PERFORM 200-OPEN-PARA
-           PERFORM 300-READ-TRANS-PARA
-           PERFORM 400-U-OR-D-MASTER-PARA
+           PERFORM 400-READ-TRANS-PARA
+           PERFORM 500-U-OR-D-MASTER-PARA
              UNTIL MORE-RECORDS = 'N'
            PERFORM 600-CLOSE-PARA 
           
@@ -70,10 +70,10 @@
        400-READ-TRANS-PARA.
            READ TRANSACTION-FILE
              AT END 
-              MOVE 'N' TO MORE-RECORDS
+              MOVE 'N' TO MORE-RECORDS.
             
-       400-U-OR-D-MASTER-PARA.
-           PERFORM 300-READ-MASTER UNTIL
+       500-U-OR-D-MASTER-PARA.
+           PERFORM 300-READ-MASTER-PARA UNTIL
               M-ACCT-NO = T-ACCT-NO
               OR
               M-ACCT-NO > T-ACCT-NO
@@ -83,11 +83,12 @@
             EVALUATE TRUE
               WHEN M-ACCT-NO = T-ACCT-NO
                 EVALUATE TRUE
-                  WHEN T-CODE = UPDATE-R
+                  WHEN T-CODE = 'U'
                     ADD T-AMOUNT TO M-AMOUNT
-                    REWRITE OLD-REC
-                  WHEN T-CODE = DELETE-R
-                    MOVE NOT-ACTIVE TO M-ACTIVE
+                    REWRITE MASTER-REC
+                  WHEN T-CODE = 'D'
+                    MOVE 'N' TO M-ACTIVE
+                    REWRITE MASTER-REC
                 END-EVALUATE
               WHEN M-ACCT-NO > T-ACCT-NO
       *CANNOT DO A WRITE ON A SEQUENTIAL FILE OPENED IN I-O MODE        
@@ -96,7 +97,7 @@
                 'NO OPERATION PERFORMED.'
             END-EVALUATE 
             
-             PERFORM 400-READ-TRANS.
+            PERFORM 400-READ-TRANS-PARA.
           
       *CLOSE THE FILES.
        600-CLOSE-PARA.
