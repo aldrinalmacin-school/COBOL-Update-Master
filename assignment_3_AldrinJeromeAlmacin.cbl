@@ -13,9 +13,12 @@
        FILE-CONTROL.
            SELECT MASTER-FILE
              ASSIGN TO 'MASTER.DAT'
-             ORGANIZATION IS LINE SEQUENTIAL.
+             ORGANIZATION IS LINE SEQUENTIAL. 
            SELECT TRANSACTION-FILE
              ASSIGN TO 'TRANS.DAT'
+             ORGANIZATION IS LINE SEQUENTIAL.
+           SELECT NEW-MASTER-FILE
+             ASSIGN TO 'NEW-MASTER.DAT'
              ORGANIZATION IS LINE SEQUENTIAL.
           
       ***********************************************************
@@ -37,76 +40,79 @@
            05 T-AMOUNT        PIC 9(5)V99.
            05 T-CODE          PIC X.
               88 UPDATE-R              VALUE 'U'.
-              88 DELETE-R              VALUE 'D'.  
+              88 DELETE-R              VALUE 'D'. 
+              
+       FD  NEW-MASTER-FILE
+           RECORD CONTAINS 13 CHARACTERS. 
+       01  MASTER-REC-NEW.
+           05 MN-ACCT-NO       PIC X(5).
+           05 MN-AMOUNT        PIC 9(5)V99.  
+           05 MN-ACTIVE        PIC X.
           
        WORKING-STORAGE SECTION.
        01  MORE-RECORDS       PIC X    VALUE 'Y'.   
            
       **********************************************************
        PROCEDURE DIVISION.
-      *OPENS THE FILES, PROCESSES THE RECORDS AND CLOSES THE FILES 
        100-MAIN-PARA.
            PERFORM 200-OPEN-PARA
-           PERFORM 400-READ-TRANS-PARA
-           PERFORM 500-U-OR-D-MASTER-PARA
-             UNTIL MORE-RECORDS = 'N'
-           PERFORM 600-CLOSE-PARA 
           
-           STOP RUN.
-      *----------------------------------------------------       
-      *OPEN THE FILES IN THE REQUIRED MODE 
-       200-OPEN-PARA.
-           OPEN   I-O     MASTER-FILE
-                  INPUT   TRANSACTION-FILE.
-                  
-      *----------------------------------------------------
-      *READ THE NEXT RECORD FROM THE OLD MASTER FILE
-       300-READ-MASTER-PARA.
-           READ MASTER-FILE
-             AT END 
-               MOVE HIGH-VALUES TO M-ACCT-NO
-           END-READ.
+           PERFORM UNTIL MORE-RECORDS = 'N'
+             READ TRANSACTION-FILE
+               AT END
+                 MOVE 'N' TO MORE-RECORDS
+               NOT AT END
+                 PERFORM 300-PROCESS-PARA
+             END-READ      
+           END-PERFORM
            
-       400-READ-TRANS-PARA.
-           READ TRANSACTION-FILE
-             AT END 
-              MOVE 'N' TO MORE-RECORDS.
-            
-       500-U-OR-D-MASTER-PARA.
-           PERFORM 300-READ-MASTER-PARA UNTIL
+           PERFORM 600-CLOSE-PARA 
+           
+           STOP RUN.
+      
+       200-OPEN-PARA.
+           OPEN  INPUT   TRANSACTION-FILE
+           OPEN  I-O     MASTER-FILE.
+                  
+       300-PROCESS-PARA.
+           EVALUATE TRUE
+             WHEN UPDATE-R
+               PERFORM 400-UPDATE-PARA
+             WHEN DELETE-R
+               PERFORM 500-DELETE-PARA
+             WHEN OTHER
+               DISPLAY 'ERROR IN TRANSACTION CODE FOR TRANSACTION '
+                'TRANSACTION NO ', T-ACCT-NO
+           END-EVALUATE.
+       
+       400-UPDATE-PARA.
+           PERFORM 800-READ-MASTER-PARA UNTIL
               M-ACCT-NO = T-ACCT-NO
               OR
-              M-ACCT-NO > T-ACCT-NO
-              OR
               M-ACCT-NO = HIGH-VALUES
-              
-            EVALUATE TRUE
-              WHEN M-ACCT-NO = T-ACCT-NO
-                EVALUATE TRUE
-                  WHEN T-CODE = 'U'
-                    ADD T-AMOUNT TO M-AMOUNT
-                    REWRITE MASTER-REC
-                  WHEN T-CODE = 'D'
-                    MOVE 'N' TO M-ACTIVE
-                    REWRITE MASTER-REC
-                END-EVALUATE
-              WHEN M-ACCT-NO > T-ACCT-NO
-      *CANNOT DO A WRITE ON A SEQUENTIAL FILE OPENED IN I-O MODE        
-      *          WRITE OLD-REC FROM TRANS-REC 
-                DISPLAY T-ACCT-NO, ' NOT ON THE MASTER FILE. '
-                'NO OPERATION PERFORMED.'
-            END-EVALUATE 
-            
-            PERFORM 400-READ-TRANS-PARA.
-          
-      *CLOSE THE FILES.
-       600-CLOSE-PARA.
-           CLOSE  MASTER-FILE
-                  TRANSACTION-FILE.
-                       
-      *********************************************************     
+             
+      *     ADD T-AMOUNT TO M-AMOUNT
+      *     REWRITE MASTER-REC
+           DISPLAY 'MASTER ACCT NO ', M-ACCT-NO
+             , 'TRANSACTION ACCOUNT NO ', T-ACCT-NO, T-CODE
+           PERFORM 700-RESET-PARA.
        
-            
-                                                
-                    
-                
+       500-DELETE-PARA.
+           DISPLAY 'MASTER ACCT NO ', M-ACCT-NO
+             , 'TRANSACTION ACCOUNT NO ', T-ACCT-NO, T-CODE
+      *     MOVE 'N' TO M-ACTIVE
+      *     REWRITE MASTER-REC.
+       .
+       
+       600-CLOSE-PARA.
+           CLOSE TRANSACTION-FILE.
+       
+       700-RESET-PARA.
+           CLOSE MASTER-FILE
+           OPEN  I-O MASTER-FILE.
+           
+       800-READ-MASTER-PARA.
+           READ MASTER-FILE
+             AT END 
+              MOVE HIGH-VALUES TO M-ACCT-NO
+           END-READ.
