@@ -1,5 +1,5 @@
-      *NAME: ANJU CHAWLA
-      *DATE: AUGUST 2, 2013
+      *NAME: ALDRIN JEROME ALMACIN
+      *DATE: AUGUST 9, 2013
       *PURPOSE: TO UPDATE OR DELETE A MASTER FILE RECORD IN PLACE USING
       *A TRANSACTION FILE.
       *THERE CAN BE NONE, ONE OR MULTIPLE TRANSACTION RECORD(IF ANY) 
@@ -47,9 +47,9 @@
       *OPENS THE FILES, PROCESSES THE RECORDS AND CLOSES THE FILES 
        100-MAIN-PARA.
            PERFORM 200-OPEN-PARA
-           PERFORM 400-READ-TRANS
-           PERFORM 500-UPDATE-PARA
-              UNTIL MORE-RECORDS = 'N'
+           PERFORM 300-READ-TRANS-PARA
+           PERFORM 400-U-OR-D-MASTER-PARA
+             UNTIL MORE-RECORDS = 'N'
            PERFORM 600-CLOSE-PARA 
           
            STOP RUN.
@@ -61,22 +61,18 @@
                   
       *----------------------------------------------------
       *READ THE NEXT RECORD FROM THE OLD MASTER FILE
-       300-READ-MASTER.
-           READ OLD-MASTER-FILE
+       300-READ-MASTER-PARA.
+           READ MASTER-FILE
              AT END 
                MOVE HIGH-VALUES TO M-ACCT-NO
            END-READ.
-      *----------------------------------------------------
-      *READ THE NEXT RECORD FROM THE TRANSACTION FILE
-       400-READ-TRANS.
+           
+       400-READ-TRANS-PARA.
            READ TRANSACTION-FILE
              AT END 
               MOVE 'N' TO MORE-RECORDS
-           END-READ. 
-      *---------------------------------------------------
-      *COMPARE THE KEY FILEDS OF THE MASTER AND TRANSACTION RECORDS
-      *AND PERFORM THE REQUIRED OPERATION
-       500-UPDATE-PARA.
+            
+       400-U-OR-D-MASTER-PARA.
            PERFORM 300-READ-MASTER UNTIL
               M-ACCT-NO = T-ACCT-NO
               OR
@@ -86,8 +82,13 @@
               
             EVALUATE TRUE
               WHEN M-ACCT-NO = T-ACCT-NO
-                ADD T-AMOUNT TO M-AMOUNT
-                REWRITE OLD-REC
+                EVALUATE TRUE
+                  WHEN T-CODE = UPDATE-R
+                    ADD T-AMOUNT TO M-AMOUNT
+                    REWRITE OLD-REC
+                  WHEN T-CODE = DELETE-R
+                    MOVE NOT-ACTIVE TO M-ACTIVE
+                END-EVALUATE
               WHEN M-ACCT-NO > T-ACCT-NO
       *CANNOT DO A WRITE ON A SEQUENTIAL FILE OPENED IN I-O MODE        
       *          WRITE OLD-REC FROM TRANS-REC 
@@ -96,9 +97,6 @@
             END-EVALUATE 
             
              PERFORM 400-READ-TRANS.
-       
-      *------------------------------------------------------ 
-       
           
       *CLOSE THE FILES.
        600-CLOSE-PARA.
