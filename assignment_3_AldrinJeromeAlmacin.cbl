@@ -88,15 +88,11 @@
        
        400-UPDATE-PARA.
            ADD T-AMOUNT TO M-AMOUNT
-           REWRITE MASTER-REC
-           DISPLAY 'MASTER ACCT NO ', M-ACCT-NO
-             , 'TRANSACTION ACCOUNT NO ', T-ACCT-NO, T-CODE.
+           REWRITE MASTER-REC.
        
        500-DELETE-PARA.
            MOVE 'N' TO M-ACTIVE
-           REWRITE MASTER-REC
-           DISPLAY 'MASTER ACCT NO ', M-ACCT-NO
-             , 'TRANSACTION ACCOUNT NO ', T-ACCT-NO, T-CODE.
+           REWRITE MASTER-REC.
        
        600-CLOSE-PARA.
            CLOSE TRANSACTION-FILE.
