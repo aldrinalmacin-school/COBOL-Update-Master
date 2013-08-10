@@ -13,9 +13,12 @@
        FILE-CONTROL.
            SELECT MASTER-FILE
              ASSIGN TO 'MASTER.DAT'
-             ORGANIZATION IS LINE SEQUENTIAL.
+             ORGANIZATION IS LINE SEQUENTIAL. 
            SELECT TRANSACTION-FILE
              ASSIGN TO 'TRANS.DAT'
+             ORGANIZATION IS LINE SEQUENTIAL.
+           SELECT NEW-MASTER-FILE
+             ASSIGN TO 'NEW-MAST.DAT'
              ORGANIZATION IS LINE SEQUENTIAL.
           
       ***********************************************************
@@ -37,76 +40,112 @@
            05 T-AMOUNT        PIC 9(5)V99.
            05 T-CODE          PIC X.
               88 UPDATE-R              VALUE 'U'.
-              88 DELETE-R              VALUE 'D'.  
+              88 DELETE-R              VALUE 'D'. 
+              
+       FD  NEW-MASTER-FILE
+           RECORD CONTAINS 13 CHARACTERS. 
+       01  NEW-MASTER-REC.
+           05 MN-ACCT-NO       PIC X(5).
+           05 MN-AMOUNT        PIC 9(5)V99.  
+           05 MN-ACTIVE        PIC X.
           
        WORKING-STORAGE SECTION.
-       01  MORE-RECORDS       PIC X    VALUE 'Y'.   
+       01  MORE-RECORDS       PIC X    VALUE 'Y'.
+       01  RESET-FILE         PIC X    VALUE 'N'.   
            
       **********************************************************
+      * CONTROLS THE MAIN LOGIC OF THE PROGRAM.
        PROCEDURE DIVISION.
-      *OPENS THE FILES, PROCESSES THE RECORDS AND CLOSES THE FILES 
        100-MAIN-PARA.
            PERFORM 200-OPEN-PARA
-           PERFORM 400-READ-TRANS-PARA
-           PERFORM 500-U-OR-D-MASTER-PARA
-             UNTIL MORE-RECORDS = 'N'
-           PERFORM 600-CLOSE-PARA 
           
-           STOP RUN.
-      *----------------------------------------------------       
-      *OPEN THE FILES IN THE REQUIRED MODE 
-       200-OPEN-PARA.
-           OPEN   I-O     MASTER-FILE
-                  INPUT   TRANSACTION-FILE.
-                  
-      *----------------------------------------------------
-      *READ THE NEXT RECORD FROM THE OLD MASTER FILE
-       300-READ-MASTER-PARA.
-           READ MASTER-FILE
-             AT END 
-               MOVE HIGH-VALUES TO M-ACCT-NO
-           END-READ.
+           PERFORM UNTIL MORE-RECORDS = 'N'
+             READ TRANSACTION-FILE
+               AT END
+                 MOVE 'N' TO MORE-RECORDS
+               NOT AT END
+                 PERFORM 800-READ-MASTER-PARA
+             END-READ      
+           END-PERFORM
            
-       400-READ-TRANS-PARA.
-           READ TRANSACTION-FILE
-             AT END 
-              MOVE 'N' TO MORE-RECORDS.
-            
-       500-U-OR-D-MASTER-PARA.
-           PERFORM 300-READ-MASTER-PARA UNTIL
-              M-ACCT-NO = T-ACCT-NO
-              OR
-              M-ACCT-NO > T-ACCT-NO
-              OR
-              M-ACCT-NO = HIGH-VALUES
-              
-            EVALUATE TRUE
-              WHEN M-ACCT-NO = T-ACCT-NO
-                EVALUATE TRUE
-                  WHEN T-CODE = 'U'
-                    ADD T-AMOUNT TO M-AMOUNT
-                    REWRITE MASTER-REC
-                  WHEN T-CODE = 'D'
-                    MOVE 'N' TO M-ACTIVE
-                    REWRITE MASTER-REC
-                END-EVALUATE
-              WHEN M-ACCT-NO > T-ACCT-NO
-      *CANNOT DO A WRITE ON A SEQUENTIAL FILE OPENED IN I-O MODE        
-      *          WRITE OLD-REC FROM TRANS-REC 
-                DISPLAY T-ACCT-NO, ' NOT ON THE MASTER FILE. '
-                'NO OPERATION PERFORMED.'
-            END-EVALUATE 
-            
-            PERFORM 400-READ-TRANS-PARA.
-          
-      *CLOSE THE FILES.
+           PERFORM 900-MOVE-TO-NEW-FILE-PARA
+           PERFORM 600-CLOSE-PARA 
+           
+           STOP RUN.
+      **********************************************************
+      * OPENS THE TRANSACTION AND MASTER FILE.
+       200-OPEN-PARA.
+           OPEN  INPUT   TRANSACTION-FILE
+           OPEN  I-O     MASTER-FILE.
+      **********************************************************
+      * FUNCTION THAT PROCESSES THE TRANSACTION RECORD. IT CHECKS
+      *  WHETHER THE RECORD SHOULD BE UPDATED, DELETED, OR NOT VALID            
+       300-PROCESS-PARA.
+           EVALUATE TRUE
+             WHEN UPDATE-R
+               PERFORM 400-UPDATE-PARA
+             WHEN DELETE-R
+               PERFORM 500-DELETE-PARA
+             WHEN OTHER
+               DISPLAY 'ERROR IN TRANSACTION CODE FOR TRANSACTION '
+                'TRANSACTION NO ', T-ACCT-NO
+           END-EVALUATE.
+      **********************************************************
+      * FUNCTION THAT UPDATES THE AMOUNT IN MASTER RECORD BASE ON THE.
+      *  AMOUNT ADDED FROM THE CORRESPONDING RECORD IN TRANSACTION 
+      *  FILE.
+       400-UPDATE-PARA.
+           ADD T-AMOUNT TO M-AMOUNT
+           REWRITE MASTER-REC.
+      **********************************************************
+      * FUNCTION THAT SETS A RECORD TO BE DELETED/NOT INCLUDED IN
+      *  THE NEW FILE.
+       500-DELETE-PARA.
+           MOVE 'N' TO M-ACTIVE
+           REWRITE MASTER-REC.
+      **********************************************************
+      * FUNCTION THAT CLOSES BOTH THE TRANSACTION AND MASTER FILE. 
        600-CLOSE-PARA.
-           CLOSE  MASTER-FILE
-                  TRANSACTION-FILE.
-                       
-      *********************************************************     
-       
-            
-                                                
-                    
-                
+           CLOSE TRANSACTION-FILE
+                 MASTER-FILE.
+      **********************************************************
+      * FUNCTION THAT RESETS THE MASTER FILE AND SETS NO TO RESET-FILE
+      *  MAKING THE RESET FILE REITERABLE.
+       700-RESET-PARA.
+           MOVE 'N' TO RESET-FILE
+           CLOSE MASTER-FILE
+           OPEN  I-O MASTER-FILE.
+      **********************************************************
+      * FUNCTION THAT READS THE MASTER FILE AND CALLS THE PROCESS
+      *  FUNCTION. ALSO CALLS RESET TO PUT THE POINTER BACK TO FIRST.
+       800-READ-MASTER-PARA.
+           PERFORM UNTIL RESET-FILE = 'Y'
+             READ MASTER-FILE
+               AT END 
+                 MOVE 'Y' TO RESET-FILE
+               NOT AT END
+                 IF M-ACCT-NO = T-ACCT-NO
+                   PERFORM 300-PROCESS-PARA
+                   MOVE 'Y' TO RESET-FILE
+                 END-IF
+             END-READ
+           END-PERFORM
+           
+           PERFORM 700-RESET-PARA.
+      **********************************************************
+      * FUNCTION TO MOVE THE ACTIVE DATA TO THE NEW FILE
+       900-MOVE-TO-NEW-FILE-PARA.
+           OPEN OUTPUT NEW-MASTER-FILE
+           PERFORM UNTIL RESET-FILE = 'Y'
+             READ MASTER-FILE
+               AT END 
+                 MOVE 'Y' TO RESET-FILE
+               NOT AT END
+                 IF M-ACTIVE = 'Y'
+                   MOVE MASTER-REC TO NEW-MASTER-REC
+                   WRITE NEW-MASTER-REC
+                 END-IF
+             END-READ
+           END-PERFORM
+           CLOSE NEW-MASTER-FILE.
+      **********************************************************
