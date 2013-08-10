@@ -54,6 +54,7 @@
        01  RESET-FILE         PIC X    VALUE 'N'.   
            
       **********************************************************
+      * CONTROLS THE MAIN LOGIC OF THE PROGRAM.
        PROCEDURE DIVISION.
        100-MAIN-PARA.
            PERFORM 200-OPEN-PARA
@@ -71,11 +72,14 @@
            PERFORM 600-CLOSE-PARA 
            
            STOP RUN.
-      
+      **********************************************************
+      * OPENS THE TRANSACTION AND MASTER FILE.
        200-OPEN-PARA.
            OPEN  INPUT   TRANSACTION-FILE
            OPEN  I-O     MASTER-FILE.
-                  
+      **********************************************************
+      * FUNCTION THAT PROCESSES THE TRANSACTION RECORD. IT CHECKS
+      *  WHETHER THE RECORD SHOULD BE UPDATED, DELETED, OR NOT VALID            
        300-PROCESS-PARA.
            EVALUATE TRUE
              WHEN UPDATE-R
@@ -86,24 +90,34 @@
                DISPLAY 'ERROR IN TRANSACTION CODE FOR TRANSACTION '
                 'TRANSACTION NO ', T-ACCT-NO
            END-EVALUATE.
-       
+      **********************************************************
+      * FUNCTION THAT UPDATES THE AMOUNT IN MASTER RECORD BASE ON THE.
+      *  AMOUNT ADDED FROM THE CORRESPONDING RECORD IN TRANSACTION 
+      *  FILE.
        400-UPDATE-PARA.
            ADD T-AMOUNT TO M-AMOUNT
            REWRITE MASTER-REC.
-       
+      **********************************************************
+      * FUNCTION THAT SETS A RECORD TO BE DELETED/NOT INCLUDED IN
+      *  THE NEW FILE.
        500-DELETE-PARA.
            MOVE 'N' TO M-ACTIVE
            REWRITE MASTER-REC.
-       
+      **********************************************************
+      * FUNCTION THAT CLOSES BOTH THE TRANSACTION AND MASTER FILE. 
        600-CLOSE-PARA.
            CLOSE TRANSACTION-FILE
                  MASTER-FILE.
-       
+      **********************************************************
+      * FUNCTION THAT RESETS THE MASTER FILE AND SETS NO TO RESET-FILE
+      *  MAKING THE RESET FILE REITERABLE.
        700-RESET-PARA.
            MOVE 'N' TO RESET-FILE
            CLOSE MASTER-FILE
            OPEN  I-O MASTER-FILE.
-           
+      **********************************************************
+      * FUNCTION THAT READS THE MASTER FILE AND CALLS THE PROCESS
+      *  FUNCTION. ALSO CALLS RESET TO PUT THE POINTER BACK TO FIRST.
        800-READ-MASTER-PARA.
            PERFORM UNTIL RESET-FILE = 'Y'
              READ MASTER-FILE
@@ -118,7 +132,8 @@
            END-PERFORM
            
            PERFORM 700-RESET-PARA.
-           
+      **********************************************************
+      * FUNCTION TO MOVE THE ACTIVE DATA TO THE NEW FILE
        900-MOVE-TO-NEW-FILE-PARA.
            OPEN OUTPUT NEW-MASTER-FILE
            PERFORM UNTIL RESET-FILE = 'Y'
@@ -133,3 +148,4 @@
              END-READ
            END-PERFORM
            CLOSE NEW-MASTER-FILE.
+      **********************************************************
