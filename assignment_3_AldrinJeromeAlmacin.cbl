@@ -50,7 +50,8 @@
            05 MN-ACTIVE        PIC X.
           
        WORKING-STORAGE SECTION.
-       01  MORE-RECORDS       PIC X    VALUE 'Y'.   
+       01  MORE-RECORDS       PIC X    VALUE 'Y'.
+       01  RESET-FILE         PIC X    VALUE 'N'.   
            
       **********************************************************
        PROCEDURE DIVISION.
@@ -62,7 +63,7 @@
                AT END
                  MOVE 'N' TO MORE-RECORDS
                NOT AT END
-                 PERFORM 300-PROCESS-PARA
+                 PERFORM 800-READ-MASTER-PARA
              END-READ      
            END-PERFORM
            
@@ -86,33 +87,36 @@
            END-EVALUATE.
        
        400-UPDATE-PARA.
-           PERFORM 800-READ-MASTER-PARA UNTIL
-              M-ACCT-NO = T-ACCT-NO
-              OR
-              M-ACCT-NO = HIGH-VALUES
-             
-      *     ADD T-AMOUNT TO M-AMOUNT
-      *     REWRITE MASTER-REC
+           ADD T-AMOUNT TO M-AMOUNT
+           REWRITE MASTER-REC
            DISPLAY 'MASTER ACCT NO ', M-ACCT-NO
-             , 'TRANSACTION ACCOUNT NO ', T-ACCT-NO, T-CODE
-           PERFORM 700-RESET-PARA.
+             , 'TRANSACTION ACCOUNT NO ', T-ACCT-NO, T-CODE.
        
        500-DELETE-PARA.
+           MOVE 'N' TO M-ACTIVE
+           REWRITE MASTER-REC
            DISPLAY 'MASTER ACCT NO ', M-ACCT-NO
-             , 'TRANSACTION ACCOUNT NO ', T-ACCT-NO, T-CODE
-      *     MOVE 'N' TO M-ACTIVE
-      *     REWRITE MASTER-REC.
-       .
+             , 'TRANSACTION ACCOUNT NO ', T-ACCT-NO, T-CODE.
        
        600-CLOSE-PARA.
            CLOSE TRANSACTION-FILE.
        
        700-RESET-PARA.
+           MOVE 'N' TO RESET-FILE
            CLOSE MASTER-FILE
            OPEN  I-O MASTER-FILE.
            
        800-READ-MASTER-PARA.
-           READ MASTER-FILE
-             AT END 
-              MOVE HIGH-VALUES TO M-ACCT-NO
-           END-READ.
+           PERFORM UNTIL RESET-FILE = 'Y'
+             READ MASTER-FILE
+               AT END 
+                 MOVE 'Y' TO RESET-FILE
+               NOT AT END
+                 IF M-ACCT-NO = T-ACCT-NO
+                   PERFORM 300-PROCESS-PARA
+                   MOVE 'Y' TO RESET-FILE
+                 END-IF
+             END-READ
+           END-PERFORM
+           
+           PERFORM 700-RESET-PARA.
