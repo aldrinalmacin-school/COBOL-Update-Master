@@ -18,7 +18,7 @@
              ASSIGN TO 'TRANS.DAT'
              ORGANIZATION IS LINE SEQUENTIAL.
            SELECT NEW-MASTER-FILE
-             ASSIGN TO 'NEW-MASTER.DAT'
+             ASSIGN TO 'NEW-MAST.DAT'
              ORGANIZATION IS LINE SEQUENTIAL.
           
       ***********************************************************
@@ -44,7 +44,7 @@
               
        FD  NEW-MASTER-FILE
            RECORD CONTAINS 13 CHARACTERS. 
-       01  MASTER-REC-NEW.
+       01  NEW-MASTER-REC.
            05 MN-ACCT-NO       PIC X(5).
            05 MN-AMOUNT        PIC 9(5)V99.  
            05 MN-ACTIVE        PIC X.
@@ -67,6 +67,7 @@
              END-READ      
            END-PERFORM
            
+           PERFORM 900-MOVE-TO-NEW-FILE-PARA
            PERFORM 600-CLOSE-PARA 
            
            STOP RUN.
@@ -95,7 +96,8 @@
            REWRITE MASTER-REC.
        
        600-CLOSE-PARA.
-           CLOSE TRANSACTION-FILE.
+           CLOSE TRANSACTION-FILE
+                 MASTER-FILE.
        
        700-RESET-PARA.
            MOVE 'N' TO RESET-FILE
@@ -116,3 +118,18 @@
            END-PERFORM
            
            PERFORM 700-RESET-PARA.
+           
+       900-MOVE-TO-NEW-FILE-PARA.
+           OPEN OUTPUT NEW-MASTER-FILE
+           PERFORM UNTIL RESET-FILE = 'Y'
+             READ MASTER-FILE
+               AT END 
+                 MOVE 'Y' TO RESET-FILE
+               NOT AT END
+                 IF M-ACTIVE = 'Y'
+                   MOVE MASTER-REC TO NEW-MASTER-REC
+                   WRITE NEW-MASTER-REC
+                 END-IF
+             END-READ
+           END-PERFORM
+           CLOSE NEW-MASTER-FILE.
